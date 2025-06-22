@@ -1,0 +1,19 @@
+# Archivos de Secretos y Entorno
+.env
+
+# Archivos de Python generados
+__pycache__/
+*.pyc
+
+# Archivos de Excel temporales
+~$*.xlsx
+
+# Carpetas de PyInstaller generadas
+dist/
+build/
+*.spec
+
+# Archivos de registro y otros
+*.log
+*.txt
+*.bat

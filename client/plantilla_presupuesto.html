@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Presupuesto Familiar Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Visualization & Content Choices:
+        - Expense Table (Report) -> Goal: Inform/Compare -> Viz: Pie Chart (Chart.js) for percentages, Bar Chart (Chart.js) for amounts, HTML Table (Análisis Detallado). Interaction: Chart tooltips. Justification: Standard, clear visualizations for budget data.
+        - Total Gasto (Report) -> Goal: Inform -> Viz: Prominent text. Justification: Key metric.
+        - Análisis Sugerencias (Report) -> Goal: Guide Analysis -> Viz: Contextual text alongside charts/tables. Justification: Explains data.
+        - Estrategias de Control (Report) -> Goal: Actionable Advice -> Viz: Formatted list/cards. Justification: Direct user benefit.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif; /* Tailwind's default sans-serif is a good start, Inter is a nice explicit choice */
+        }
+        .tab-button {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .tab-button.active {
+            background-color: #0D9488; /* teal-600 */
+            color: white;
+        }
+        .tab-button:not(.active):hover {
+            background-color: #F0FDF4; /* teal-50 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px; /* Adjusted for potentially smaller screens or side-by-side layouts */
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px; /* Base height */
+            max-height: 350px; /* Max height */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .chart-container {
+                height: 350px;
+                max-height: 400px;
+            }
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+            padding: 1.5rem; /* p-6 */
+        }
+        h2 {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 600; /* font-semibold */
+            color: #1E293B; /* slate-800 */
+            margin-bottom: 1rem; /* mb-4 */
+        }
+        h3 {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 600; /* font-semibold */
+            color: #334155; /* slate-700 */
+            margin-top: 1.5rem; /* mt-6 */
+            margin-bottom: 0.75rem; /* mb-3 */
+        }
+        p, li {
+            color: #475569; /* slate-600 */
+            line-height: 1.6;
+        }
+        ul {
+            list-style-position: inside;
+            padding-left: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-700">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8 max-w-6xl">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-bold text-teal-700">Mi Presupuesto Familiar Interactivo</h1>
+            <p class="text-slate-500 mt-2">Una herramienta para visualizar y entender tus finanzas.</p>
+        </header>
+
+        <nav class="mb-8 flex flex-wrap justify-center gap-2 sm:gap-3">
+            <button data-tab="resumen" class="tab-button active text-sm sm:text-base font-medium py-2 px-3 sm:px-4 rounded-md text-teal-700 hover:bg-teal-50">Resumen General</button>
+            <button data-tab="analisis" class="tab-button text-sm sm:text-base font-medium py-2 px-3 sm:px-4 rounded-md text-teal-700 hover:bg-teal-50">Análisis Detallado</button>
+            <button data-tab="estrategias" class="tab-button text-sm sm:text-base font-medium py-2 px-3 sm:px-4 rounded-md text-teal-700 hover:bg-teal-50">Estrategias de Control</button>
+        </nav>
+
+        <main>
+            <section id="resumen" class="tab-content card">
+                <h2>Resumen General de Gastos</h2>
+                <p class="mb-6">Esta sección te ofrece una vista rápida de cómo se distribuyen tus gastos mensuales. Utiliza los gráficos para identificar las categorías más significativas y el monto total de tus egresos.</p>
+                <div class="text-center mb-8">
+                    <p class="text-xl text-slate-600">Gasto Total Mensual Estimado:</p>
+                    <p id="totalAmountDisplay" class="text-4xl font-bold text-teal-600"></p>
+                </div>
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div>
+                        <h3 class="text-center">Distribución de Gastos (%)</h3>
+                        <div class="chart-container mx-auto">
+                            <canvas id="pieChartGastos"></canvas>
+                        </div>
+                        <p class="text-sm text-center mt-2 text-slate-500">Pasa el cursor sobre el gráfico para ver detalles.</p>
+                    </div>
+                    <div>
+                        <h3 class="text-center">Comparación de Montos ($)</h3>
+                        <div class="chart-container mx-auto">
+                            <canvas id="barChartGastos"></canvas>
+                        </div>
+                        <p class="text-sm text-center mt-2 text-slate-500">Pasa el cursor sobre las barras para ver montos.</p>
+                    </div>
+                </div>
+                 <div class="mt-8 p-4 bg-teal-50 rounded-lg">
+                    <h3 class="text-teal-700 !mt-0">Puntos Clave del Resumen:</h3>
+                    <ul class="list-disc ml-5 text-slate-700">
+                        <li>Identifica rápidamente las categorías que consumen la mayor parte de tu presupuesto.</li>
+                        <li>Compara visualmente el impacto monetario de cada gasto.</li>
+                        <li>El gasto total te da una cifra clara de tus egresos mensuales.</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section id="analisis" class="tab-content card hidden">
+                <h2>Análisis Detallado de tu Presupuesto</h2>
+                <p class="mb-6">Aquí profundizamos en diferentes formas de analizar tus gastos para obtener una comprensión más completa y estratégica de tus finanzas. Estos análisis te ayudarán a identificar patrones y áreas potenciales de mejora.</p>
+
+                <div class="space-y-6">
+                    <div>
+                        <h3>1. Identificación de Categorías Principales</h3>
+                        <p>Observa cuáles son las 3-5 categorías que consumen la mayor parte de tu presupuesto. En tu caso, son claramente "Dieta familiar", "Almuerzos" y "Supermercado". Juntas, estas tres categorías representan casi la mitad de tus gastos totales (48.44%). Este es un punto de partida crucial para cualquier estrategia de optimización.</p>
+                    </div>
+
+                    <div>
+                        <h3>2. Clasificación de Gastos</h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="p-4 border border-slate-200 rounded-lg">
+                                <h4 class="font-semibold text-slate-700 mb-2">Necesidades vs. Deseos</h4>
+                                <p>Diferencia entre gastos esenciales (ej: Agua, Luz, Supermercado básico) y gastos discrecionales o "deseos" (ej: Cafetería, Regalos, parte de los Almuerzos fuera de casa). Esto te ayuda a identificar dónde podrías recortar más fácilmente si necesitas ahorrar, sin afectar tu calidad de vida básica.</p>
+                            </div>
+                            <div class="p-4 border border-slate-200 rounded-lg">
+                                <h4 class="font-semibold text-slate-700 mb-2">Fijos vs. Variables</h4>
+                                <p>Los gastos fijos son aquellos que no cambian mucho mes a mes (ej: Internet, Psicóloga si es una tarifa fija). Los variables fluctúan (ej: Gasolina, Supermercado, Regalos). Entender esto te ayuda a prever, planificar y encontrar áreas donde tienes más margen de maniobra para ajustar.</p>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-sm text-slate-500">Aplicación: Una vez clasificados, podrías crear sub-totales. Por ejemplo, ¿cuánto suman tus "deseos" al mes? ¿Cuánto tus gastos variables?</p>
+                    </div>
+
+                    <div>
+                        <h3>3. Análisis de Tendencias (Seguimiento Mensual)</h3>
+                        <p>Este es uno de los análisis más poderosos a largo plazo. Consiste en registrar tus gastos reales cada mes y compararlos con tu presupuesto y con meses anteriores. Aunque esta aplicación muestra una foto actual, te recomendamos llevar este registro para:</p>
+                        <ul class="list-disc mt-2">
+                            <li>Identificar si ciertos gastos están aumentando con el tiempo.</li>
+                            <li>Detectar meses con picos de gasto (ej: diciembre por regalos) y planificar para ellos.</li>
+                            <li>Evaluar si se están cumpliendo tus metas de reducción en ciertas áreas.</li>
+                        </ul>
+                        <p class="mt-3 text-sm text-slate-500">Gráfico Sugerido (para tu seguimiento personal): Un Gráfico de Líneas es excelente para mostrar tendencias.</p>
+                    </div>
+
+                    <div>
+                        <h3>4. Regla 50/30/20 (Como Referencia)</h3>
+                        <p>Es una guía popular para distribuir ingresos:</p>
+                        <ul class="list-disc mt-2">
+                            <li><strong>50% para Necesidades:</strong> Gastos esenciales como vivienda, comida básica, transporte esencial, servicios.</li>
+                            <li><strong>30% para Deseos:</strong> Salidas, hobbies, compras no esenciales, cafetería.</li>
+                            <li><strong>20% para Ahorro y Deudas:</strong> Metas de ahorro, pago de préstamos (si los hubiera).</li>
+                        </ul>
+                        <p class="mt-3">Aplicación: Calcula tus porcentajes actuales para "Necesidades" y "Deseos" según tu clasificación y compáralos con esta regla. Te puede dar una idea de si tu gasto en "deseos" es proporcionalmente alto. (Nota: Con tus datos, una gran parte es alimentación, que es una necesidad, pero dentro de ella puede haber componentes de "deseo" como comer fuera vs. cocinar).</p>
+                    </div>
+                    <div class="mt-8 p-4 bg-teal-50 rounded-lg">
+                         <h3 class="text-teal-700 !mt-0">Tabla Detallada de Gastos:</h3>
+                         <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200">
+                                <thead class="bg-slate-100">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Categoría</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Monto ($)</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Porcentaje (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expenseTableBody" class="bg-white divide-y divide-slate-200">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="estrategias" class="tab-content card hidden">
+                <h2>Estrategias para Controlar Gastos Excesivos</h2>
+                <p class="mb-6">Conocer tus números es el primer paso. El siguiente es actuar. Aquí tienes algunas estrategias efectivas que puedes implementar para tomar el control de tus gastos y mejorar tu salud financiera.</p>
+                <div class="space-y-4">
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Prioriza tus Gastos</summary>
+                        <p class="mt-2">Una vez identificadas las áreas de mayor gasto o los gastos "deseo", decide cuáles son menos importantes para ti y dónde podrías hacer ajustes. No se trata de eliminar todo lo que te gusta, sino de tomar decisiones conscientes.</p>
+                    </details>
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Establece Metas de Gasto</summary>
+                        <p class="mt-2">Para categorías variables o de "deseo" (ej: "Cafetería", "Regalos"), fija un límite mensual y trata de no excederlo. Usar sobres de efectivo o apps de seguimiento puede ayudar.</p>
+                    </details>
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Planifica Compras Grandes</summary>
+                        <p class="mt-2">Especialmente para supermercado, haz una lista y evita compras impulsivas. Considera comprar al por mayor ciertos productos no perecibles si es más económico y tienes espacio para almacenar.</p>
+                    </details>
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Busca Alternativas Más Económicas</summary>
+                        <ul class="list-disc mt-2">
+                            <li>¿Puedes cocinar más en casa en lugar de comprar almuerzos todos los días? Preparar comida para varios días (meal prep) puede ahorrar tiempo y dinero.</li>
+                            <li>Compara precios de servicios como internet o planes de celular. A veces hay ofertas o planes más ajustados a tus necesidades.</li>
+                            <li>Para regalos, considera opciones hechas a mano, experiencias en lugar de objetos costosos, o regalos grupales.</li>
+                        </ul>
+                    </details>
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Revisa Facturas y Suscripciones</summary>
+                        <p class="mt-2">Asegúrate de que no estás pagando por servicios que ya no utilizas o que podrías consolidar. Muchas suscripciones pequeñas pueden sumar un monto considerable.</p>
+                    </details>
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Implementa un "Día sin Gasto"</summary>
+                        <p class="mt-2">Intenta tener uno o dos días a la semana donde te propongas no hacer ningún gasto discrecional. Esto puede ayudarte a romper hábitos de consumo y a ser más creativo con tus recursos.</p>
+                    </details>
+                    <details class="p-4 border border-slate-200 rounded-lg group">
+                        <summary class="font-semibold text-slate-700 cursor-pointer group-open:text-teal-600">Usa Herramientas de Seguimiento</summary>
+                        <p class="mt-2">Hay muchas apps de presupuesto (gratuitas y de pago) que te pueden ayudar a registrar y categorizar tus gastos automáticamente, facilitando el seguimiento y análisis.</p>
+                    </details>
+                </div>
+            </section>
+        </main>
+
+        <footer class="mt-12 pt-8 border-t border-slate-200 text-center">
+            <p class="text-sm text-slate-500">&copy; <span id="currentYear"></span> Presupuesto Interactivo. Una herramienta para tu bienestar financiero.</p>
+        </footer>
+    </div>
+
+    <script>
+		const expenseData = {{ datos_gastos_json | safe }};
+		
+		/*
+        const expenseData = [
+            { categoria: "Dieta familiar", monto: 1500 },
+            { categoria: "Almuerzos", monto: 1440 },
+            { categoria: "Supermercado", monto: 1400 },
+            { categoria: "Cafetería", monto: 600 },
+            { categoria: "Gasolina", monto: 500 },
+            { categoria: "Internet, Cable, celulares", monto: 500 },
+            { categoria: "Almuerzos domingos", monto: 500 },
+            { categoria: "Medicamentos", monto: 500 },
+            { categoria: "Psicóloga", monto: 480 },
+            { categoria: "Regalos", monto: 300 },
+            { categoria: "Limpieza", monto: 240 },
+            { categoria: "Luz", monto: 200 },
+            { categoria: "Agua", monto: 200 },
+            { categoria: "Bodegas", monto: 200 },
+            { categoria: "Recarga de tarjetas de bus", monto: 200 },
+            { categoria: "Odontóloga", monto: 200 }
+        ];
+		*/
+        const totalGastos = expenseData.reduce((sum, item) => sum + item.monto, 0);
+        document.getElementById('totalAmountDisplay').textContent = `$${totalGastos.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        const processedData = expenseData.map(item => ({
+            ...item,
+            porcentaje: (item.monto / totalGastos) * 100
+        })).sort((a, b) => b.monto - a.monto);
+
+        const labels = processedData.map(item => item.categoria);
+        const montos = processedData.map(item => item.monto);
+        
+        const backgroundColors = [
+            '#0D9488', '#0F766E', '#14B8A6', '#10B981', '#34D399', '#6EE7B7', 
+            '#A7F3D0', '#047857', '#065F46', '#064E3B', '#FDBA74', '#FB923C',
+            '#F97316', '#EA580C', '#C2410C', '#9A3412' 
+        ];
+        const hoverBackgroundColors = backgroundColors.map(color => `${color}E6`); // Add some transparency on hover
+
+        function createPieChart() {
+            const ctxPie = document.getElementById('pieChartGastos').getContext('2d');
+            if (window.myPieChart instanceof Chart) {
+                window.myPieChart.destroy();
+            }
+            window.myPieChart = new Chart(ctxPie, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Distribución de Gastos',
+                        data: montos,
+                        backgroundColor: backgroundColors,
+                        hoverBackgroundColor: hoverBackgroundColors,
+                        borderColor: '#ffffff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 10 },
+                                boxWidth: 15,
+                                padding: 15,
+                                generateLabels: function(chart) {
+                                    const data = chart.data;
+                                    if (data.labels.length && data.datasets.length) {
+                                        return data.labels.map(function(label, i) {
+                                            const meta = chart.getDatasetMeta(0);
+                                            const style = meta.controller.getStyle(i);
+                                            let text = label;
+                                            if (text.length > 20) { // Truncate long labels for legend
+                                                text = text.substring(0, 18) + '...';
+                                            }
+                                            return {
+                                                text: text,
+                                                fillStyle: style.backgroundColor,
+                                                strokeStyle: style.borderColor,
+                                                lineWidth: style.borderWidth,
+                                                hidden: isNaN(data.datasets[0].data[i]) || meta.data[i].hidden,
+                                                index: i
+                                            };
+                                        });
+                                    }
+                                    return [];
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    const value = context.parsed;
+                                    const percentage = ((value / totalGastos) * 100).toFixed(2);
+                                    label += `$${value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${percentage}%)`;
+                                    return label;
+                                },
+                                title: function(tooltipItems) {
+                                    // Wrap title if too long
+                                    let title = tooltipItems[0].label;
+                                    const maxLength = 25; // Max characters per line in tooltip title
+                                    if (title.length > maxLength) {
+                                        const words = title.split(' ');
+                                        let currentLine = '';
+                                        const lines = [];
+                                        words.forEach(word => {
+                                            if ((currentLine + word).length > maxLength) {
+                                                lines.push(currentLine.trim());
+                                                currentLine = word + ' ';
+                                            } else {
+                                                currentLine += word + ' ';
+                                            }
+                                        });
+                                        lines.push(currentLine.trim());
+                                        return lines;
+                                    }
+                                    return title;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createBarChart() {
+            const ctxBar = document.getElementById('barChartGastos').getContext('2d');
+            if (window.myBarChart instanceof Chart) {
+                window.myBarChart.destroy();
+            }
+            window.myBarChart = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Monto Gastado ($)',
+                        data: montos,
+                        backgroundColor: backgroundColors,
+                        hoverBackgroundColor: hoverBackgroundColors,
+                        borderColor: backgroundColors.map(color => `${color}CC`),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Horizontal bar chart for better readability of labels
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Monto ($)'
+                            }
+                        },
+                        y: {
+                           ticks: {
+                                autoSkip: false, // Ensure all labels are shown
+                                callback: function(value, index, values) {
+                                    let label = this.getLabelForValue(value);
+                                    if (label.length > 16) { // Max chars before wrapping for y-axis labels
+                                        return label.substring(0, 15) + '...';
+                                    }
+                                    return label;
+                                }
+                           }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false // Legend is redundant for a single dataset bar chart
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    const value = context.parsed.x;
+                                    label += `$${value.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                                    return label;
+                                },
+                                title: function(tooltipItems) {
+                                    // Wrap title if too long
+                                    let title = tooltipItems[0].label;
+                                    const maxLength = 25;
+                                    if (title.length > maxLength) {
+                                        const words = title.split(' ');
+                                        let currentLine = '';
+                                        const lines = [];
+                                        words.forEach(word => {
+                                            if ((currentLine + word).length > maxLength) {
+                                                lines.push(currentLine.trim());
+                                                currentLine = word + ' ';
+                                            } else {
+                                                currentLine += word + ' ';
+                                            }
+                                        });
+                                        lines.push(currentLine.trim());
+                                        return lines;
+                                    }
+                                    return title;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function populateExpenseTable() {
+            const tableBody = document.getElementById('expenseTableBody');
+            tableBody.innerHTML = ''; // Clear existing rows
+            processedData.forEach(item => {
+                const row = `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">${item.categoria}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">$${item.monto.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-700">${item.porcentaje.toFixed(2)}%</td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        }
+
+
+        const tabs = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(item => item.classList.remove('active'));
+                tab.classList.add('active');
+
+                const targetTab = tab.getAttribute('data-tab');
+                tabContents.forEach(content => {
+                    if (content.id === targetTab) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+                 // Re-initialize charts if they are in the active tab and might need redraw due to layout changes
+                if (targetTab === 'resumen') {
+                    // Small delay to ensure container is visible and sized
+                    setTimeout(() => {
+                        if (document.getElementById('pieChartGastos').offsetParent !== null) createPieChart();
+                        if (document.getElementById('barChartGastos').offsetParent !== null) createBarChart();
+                    }, 50);
+                }
+            });
+        });
+
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+        
+        // Initial chart and table creation
+        if (document.getElementById('pieChartGastos').offsetParent !== null) createPieChart();
+        if (document.getElementById('barChartGastos').offsetParent !== null) createBarChart();
+        populateExpenseTable();
+
+    </script>
+</body>
+</html>
