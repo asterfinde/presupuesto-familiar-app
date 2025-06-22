@@ -15,5 +15,4 @@ build/
 
 # Archivos de registro y otros
 *.log
-*.txt
 *.bat
