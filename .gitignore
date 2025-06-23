@@ -12,3 +12,6 @@ build/
 # Ignorar la carpeta _check y todos los archivos .txt
 _check/
 *.txt
+
+# ¡NO IGNORAR requirements.txt!
+!requirements.txt
