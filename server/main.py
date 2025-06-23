@@ -20,8 +20,6 @@ app = FastAPI(
     description="Un intermediario seguro para analizar gastos usando la IA de Anthropic."
 )
 
-# NOTA: Se quitó la inicialización del cliente de Anthropic de aquí.
-
 # pinger: servicio externo, hace una petición HTTP cada 5-10 minutos
 @app.api_route(
     "/health",
@@ -63,10 +61,9 @@ async def analizar_gastos(request_data: AnalisisRequest):
 
     gastos_str = "\n".join([f"- {g.categoria}: ${g.monto:,.2f}" for g in request_data.gastos])
     prompt = f"""
-    Eres un amigable asesor financiero peruano...
-    ... (El resto del prompt se mantiene igual) ...
+    Eres un amigable asesor financiero peruano. Tu tarea es analizar una lista 
+    de gastos mensuales y generar un reporte en dos partes, usando formato HTML.
     """
-
     try:
         message = anthropic_client.messages.create(
             model="claude-sonnet-4-20250514", # Usando tu modelo validado
