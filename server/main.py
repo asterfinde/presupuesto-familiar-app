@@ -66,3 +66,9 @@ async def analizar_gastos(request_data: AnalisisRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al comunicarse con la API de Anthropic: {str(e)}")
+
+# pinger: servicio externo, hace una petición HTTP cada 5-10 minutos
+@app.get("/health", status_code=200, summary="Verifica el estado del servidor")
+async def health_check():
+    """Endpoint simple para verificar que el servidor está activo."""
+    return {"status": "ok"}        
