@@ -7,7 +7,7 @@ import sys
 import os
 import requests
 
-SERVER_URL = "https://my-budgen.onrender.com/analizar" 
+SERVER_URL = "https://presupuesto-familiar-app.vercel.app/analizar" 
 
 # La función resource_path() es para encontrar archivos empaquetados DENTRO del .exe
 def resource_path(relative_path):
