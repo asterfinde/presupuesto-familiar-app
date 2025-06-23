@@ -20,9 +20,29 @@ app = FastAPI(
     description="Un intermediario seguro para analizar gastos usando la IA de Anthropic."
 )
 
-# NOTA: Hemos quitado la inicialización del cliente de Anthropic de aquí.
+# NOTA: Se quitó la inicialización del cliente de Anthropic de aquí.
 
-@app.post("/analizar", summary="Analiza una lista de gastos")
+# pinger: servicio externo, hace una petición HTTP cada 5-10 minutos
+@app.api_route(
+    "/health",
+    methods=["GET", "HEAD"], # <-- LA CLAVE ESTÁ AQUÍ: Aceptamos ambos métodos
+    status_code=200,
+    summary="Verifica el estado del servidor",
+    tags=["Mantenimiento"] # Es una buena práctica agregar tags para organizar
+)
+async def health_check():
+    """
+    Endpoint simple para verificar que el servidor está activo.
+    Compatible con peticiones GET y HEAD para servicios de monitoreo como UptimeRobot.
+    """
+    # Importante: No devuelvas un cuerpo en la respuesta si el método es HEAD.
+    # FastAPI lo maneja automáticamente, así que puedes dejar el return como está.
+    return {"status": "ok"}
+
+@app.post(
+    "/analizar", 
+    summary="Analiza una lista de gastos"
+)
 async def analizar_gastos(request_data: AnalisisRequest):
     """
     Recibe una lista de gastos, la formatea y la envía a la API de Anthropic
@@ -67,8 +87,3 @@ async def analizar_gastos(request_data: AnalisisRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error al comunicarse con la API de Anthropic: {str(e)}")
 
-# pinger: servicio externo, hace una petición HTTP cada 5-10 minutos
-@app.get("/health", status_code=200, summary="Verifica el estado del servidor")
-async def health_check():
-    """Endpoint simple para verificar que el servidor está activo."""
-    return {"status": "ok"}        
