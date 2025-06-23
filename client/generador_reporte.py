@@ -1,60 +1,56 @@
-# generador_reporte.py - El Cliente de Escritorio
+# generador_reporte.py - El Cliente de Escritorio (Versión Final)
 
 import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 import json
 import sys
 import os
-import requests # <--- ¡Nueva importación!
+import requests
 
-# --- CONSTANTES ---
-# Esta es la URL de tu servidor FastAPI. 
-# Para pruebas locales, es esta. Para producción, será tu URL pública.
-SERVER_URL = "http://127.0.0.1:8000/analizar" 
+SERVER_URL = "https://my-budgen.onrender.com/analizar" 
 
-# La función resource_path() no cambia.
+# La función resource_path() es para encontrar archivos empaquetados DENTRO del .exe
 def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
     try:
+        # PyInstaller crea una carpeta temporal y guarda la ruta en _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
 # --- ARCHIVOS ---
-EXCEL_FILE = 'gastos.xlsx'
-TEMPLATE_FILE = 'plantilla_presupuesto.html'
+# El Excel es un archivo EXTERNO, lo buscamos en la carpeta actual. No usamos resource_path.
+EXCEL_FILE = 'gastos.xlsx' 
+# La plantilla es un recurso INTERNO, empaquetado, usamos resource_path para encontrarla.
+TEMPLATE_FILE_PATH = resource_path('plantilla_presupuesto.html')
 OUTPUT_FILE = 'reporte_final.html'
 
 # --- SCRIPT PRINCIPAL ---
 try:
-    # 1. Leer y procesar datos de Excel (sin cambios)
     print("Leyendo archivo de gastos...")
+    # 1. Leer y procesar datos de Excel (sin cambios, leerá el archivo externo)
     df = pd.read_excel(EXCEL_FILE, sheet_name='Gastos')
     df_sorted = df.sort_values(by='Monto', ascending=False)
     datos_gastos_dict = df_sorted.rename(columns={'Categoria': 'categoria', 'Monto': 'monto'}).to_dict('records')
     datos_gastos_json = json.dumps(datos_gastos_dict, indent=4)
 
-    # 2. Llamar a nuestro Servidor para obtener el análisis (NUEVA LÓGICA)
+    # 2. Llamar a nuestro Servidor para obtener el análisis (sin cambios)
     print(f"Contactando a nuestro servidor en {SERVER_URL} para el análisis...")
-    
-    # Preparamos los datos en el formato que nuestra API espera (definido en Pydantic)
     payload = {"gastos": datos_gastos_dict}
-    
-    # Hacemos la petición POST a nuestro servidor FastAPI
     response = requests.post(SERVER_URL, json=payload)
-    
-    # Verificamos si la petición fue exitosa
     response.raise_for_status() 
     
-    # Extraemos los análisis del JSON de respuesta
     ai_data = response.json()
     analisis_detallado = ai_data.get("analisis_detallado", "<p>Error: No se recibió análisis.</p>")
     estrategias_control = ai_data.get("estrategias_control", "<p>Error: No se recibieron estrategias.</p>")
     print("Análisis recibido exitosamente.")
 
-    # 3. Renderizar la plantilla HTML (actualizado)
-    env = Environment(loader=FileSystemLoader(os.path.dirname(os.path.abspath(__file__))))
-    template = env.get_template(TEMPLATE_FILE)
+    # 3. Renderizar la plantilla HTML (ajustado para máxima compatibilidad)
+    template_dir = os.path.dirname(TEMPLATE_FILE_PATH)
+    template_file_name = os.path.basename(TEMPLATE_FILE_PATH)
+    env = Environment(loader=FileSystemLoader(template_dir))
+    template = env.get_template(template_file_name)
     
     html_final = template.render(
         datos_gastos_json=datos_gastos_json,
@@ -69,9 +65,13 @@ try:
     print(f"\n¡Éxito! Se ha generado el archivo '{OUTPUT_FILE}'.")
     input("Presiona Enter para salir.")
 
+except FileNotFoundError:
+    print(f"\nERROR: No se pudo encontrar el archivo '{EXCEL_FILE}'.")
+    print("Asegúrate de que el archivo de Excel esté en la misma carpeta que el programa .exe.")
+    input("Presiona Enter para salir.")
 except requests.exceptions.RequestException as e:
     print(f"\nERROR DE CONEXIÓN: No se pudo conectar con el servidor en {SERVER_URL}.")
-    print(f"Asegúrate de que el servidor (uvicorn main:app --reload) esté corriendo.")
+    print(f"Asegúrate de tener una conexión a internet.")
     print(f"Detalle del error: {e}")
     input("Presiona Enter para salir.")
 except Exception as e:
